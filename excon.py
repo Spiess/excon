@@ -5,6 +5,15 @@ import sys
 
 from PyPDF2 import PdfFileMerger
 
+SPECIAL_REPLACEMENTS = [
+    ('Ä', 'Ae'),
+    ('Ö', 'Oe'),
+    ('Ü', 'Ue'),
+    ('ä', 'ae'),
+    ('ö', 'oe'),
+    ('ü', 'ue')
+]
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -84,9 +93,15 @@ def main():
 def find_group(groups, lastname):
     for i, group in enumerate(groups):
         for name in group:
-            if name.endswith(lastname):
+            if replace_special(name).endswith(lastname):
                 return i
     return -1
+
+
+def replace_special(s):
+    for character, replacement in SPECIAL_REPLACEMENTS:
+        s = s.replace(character, replacement)
+    return s
 
 
 if __name__ == '__main__':

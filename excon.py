@@ -3,7 +3,7 @@ import csv
 import os
 import sys
 
-from PyPDF2 import PdfFileMerger
+from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 
 SPECIAL_REPLACEMENTS = [
     ('Ä', 'Ae'),
@@ -18,15 +18,17 @@ SPECIAL_REPLACEMENTS = [
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('groups_file', help="CSV file containing group member names. Each row is a group.")
-    parser.add_argument('source_directory', help="Source directory containing subdirectories with original documents.")
-    parser.add_argument('target_directory', help="Directory to write results to.")
-    parser.add_argument('exercise', help="The name or number of the exercise.")
-    parser.add_argument('--strict', help="Use strict mode for PDF file merging.", action='store_true')
-    parser.add_argument('--ignore-error', help="Merge found PDFs even if errors occur.", action='store_true')
+    parser.add_argument('mode', help='Execution mode: "merge" to merge exercises, "split" to split corrected.')
+    parser.add_argument('groups_file', help='CSV file containing group member names. Each row is a group.')
+    parser.add_argument('source_directory', help='Source directory containing subdirectories with original documents.')
+    parser.add_argument('target_directory', help='Directory to write results to.')
+    parser.add_argument('exercise', help='The name or number of the exercise.')
+    parser.add_argument('--strict', help='Use strict mode for PDF file merging.', action='store_true')
+    parser.add_argument('--ignore-error', help='Merge found PDFs even if errors occur.', action='store_true')
 
     args = parser.parse_args()
 
+    mode = args.mode
     groups_file = args.groups_file
     source = args.source_directory
     target = args.target_directory
@@ -75,6 +77,13 @@ def main():
             continue
         hand_ins[i] = os.path.join(directory, pdfs[0])
 
+    if mode == 'merge':
+        merge_exercises(hand_ins, groups, target, exercise, error, ignore_error, strict)
+    elif mode == 'split':
+        split_exercises(hand_ins, groups, target, exercise, error, ignore_error, strict)
+
+
+def merge_exercises(hand_ins, groups, target, exercise, error, ignore_error, strict):
     merger = PdfFileMerger(strict=strict)
     for i, pdf in enumerate(hand_ins):
         if not pdf:
@@ -95,6 +104,31 @@ def main():
     print(f'Merged PDF written to {target_file}.')
 
 
+def split_exercises(hand_ins, groups, target, exercise, error, ignore_error, strict):
+    if not ignore_error and error:
+        print('Errors have occurred and no split PDFs were written. Correct errors manually or use the "--ignore-error"'
+              ' flag to proceed.')
+        return
+
+    index = 0  # Page index
+    with open(os.path.join(target, f'{exercise} All.pdf'), 'rb') as merged:
+        split_reader = PdfFileReader(merged, strict=strict)
+        for i, pdf in enumerate(hand_ins):
+            if not pdf:
+                print(f'ERROR: No hand-in for group {i} - {groups[i]}!', file=sys.stderr)
+                continue
+            split_writer = PdfFileWriter()
+            pages = get_num_pages(pdf, strict)
+            for j in range(index, index + pages):
+                page = split_reader.getPage(j)
+                split_writer.addPage(page)
+            index += pages
+            target_file = os.path.join(target, f'{exercise} {" ".join([name.split()[-1] for name in groups[i]])}.pdf')
+            with open(target_file, 'wb') as split_file:
+                split_writer.write(split_file)
+            print(f'Split PDF for group {i} written to {target_file}.')
+
+
 def find_group(groups, lastname):
     for i, group in enumerate(groups):
         for name in group:
@@ -107,6 +141,12 @@ def replace_special(s):
     for character, replacement in SPECIAL_REPLACEMENTS:
         s = s.replace(character, replacement)
     return s
+
+
+def get_num_pages(pdf, strict=True):
+    with open(pdf, 'rb') as group_pdf:
+        group_reader = PdfFileReader(group_pdf, strict=strict)
+        return group_reader.getNumPages()
 
 
 if __name__ == '__main__':

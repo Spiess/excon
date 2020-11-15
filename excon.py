@@ -39,18 +39,23 @@ def main():
     with open(groups_file) as file:
         csv_reader = csv.reader(file)
         for row in csv_reader:
-            groups.append(row)
+            groups.append([name for name in row if name])
 
     # Expects source directory to be structured as: source dir/Team dir/Lastname_Firstname_email_number dir/hand-in.pdf
     team_dirs = [d for d in os.listdir(source) if os.path.isdir(os.path.join(source, d))]
     dirs = [(d, sd) for d in team_dirs for sd in os.listdir(os.path.join(source, d)) if
             os.path.isdir(os.path.join(source, d, sd)) and os.listdir(os.path.join(source, d, sd))]
 
-    # TODO: Check that no two students have the same last name
+    # Check that no two students have the same last name
+    last_names = [name.split()[-1] for group in groups for name in group]
+    if len(last_names) != len(set(last_names)):
+        print('ERROR: Two students appear to have the same last name, which is not supported in this version of excon!',
+              file=sys.stderr)
+        exit(1)
 
     error = False
 
-    hand_ins = [None] * len(groups)
+    hand_ins = [''] * len(groups)
     for d, s in dirs:
         lastname = s.split('_')[0]
         i = find_group(groups, lastname)

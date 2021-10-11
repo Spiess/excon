@@ -48,21 +48,16 @@ def main():
     dirs = [(d, sd) for d in team_dirs for sd in os.listdir(os.path.join(source, d)) if
             os.path.isdir(os.path.join(source, d, sd)) and os.listdir(os.path.join(source, d, sd))]
 
-    # Check that no two students have the same last name
-    last_names = [name.split()[-1] for group in groups for name in group]
-    if len(last_names) != len(set(last_names)):
-        print('ERROR: Two students appear to have the same last name, which is not supported in this version of excon!',
-              file=sys.stderr)
-        exit(1)
-
     error = False
 
     hand_ins = [''] * len(groups)
     for d, s in dirs:
-        lastname = s.split('_')[0]
-        i = find_group(groups, lastname)
+        parts = s.split('_')
+        lastname = parts[0]
+        firstname = parts[1]
+        i = find_group(groups, f'{firstname} {lastname}')
         if i == -1:
-            print(f'ERROR: Name not found "{lastname}"!', file=sys.stderr)
+            print(f'ERROR: Name not found in groups "{firstname} {lastname}"!', file=sys.stderr)
             error = True
             continue
         if hand_ins[i]:
@@ -129,10 +124,10 @@ def split_exercises(hand_ins, groups, target, exercise, error, ignore_error, str
             print(f'Split PDF for group {i} written to {target_file}.')
 
 
-def find_group(groups, lastname):
+def find_group(groups, name):
     for i, group in enumerate(groups):
-        for name in group:
-            if replace_special(name).endswith(lastname):
+        for member in group:
+            if replace_special(member) == name:
                 return i
     return -1
 
